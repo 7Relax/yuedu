@@ -9,6 +9,7 @@
 <script>
 var _self;
 var openid, session_key, pageOptions;
+var sign = require("../../commons/sign.js");
 export default {
 	methods: {
 		/**
@@ -29,7 +30,7 @@ export default {
 					var iv            = info.mp.detail.iv;
 					var signature     = info.mp.detail.signature;
 					var uInfo         = info.mp.detail.userInfo;
-			    与服务器端交互进行解密
+			    与服务器端交互进行解密，以下代码只是在unionId版本的写法
 				    uni.request({
 					    url: _self.apiServer+'member&m=wxaes', // 地址
 					    method: 'POST',
@@ -44,22 +45,11 @@ export default {
 					    }
 				    });
 			 */
-			// 模拟登录成功
-			uni.showToast({title: '登录成功'});
-			uni.setStorageSync('SUID', '123');
-			uni.setStorageSync('SRAND', '456');
-			uni.setStorageSync('SNAME', '小明');
-			uni.setStorageSync('SFACE', 'fjdsafdsa');
-			// 跳转 {"backpage":"../write/write","backtype":"2"} 
-			if (pageOptions.backpage == '1') { // 约定的而已
-				uni.redirectTo({url: pageOptions.backpage})
-			} else {
-				uni.switchTab({url: pageOptions.backpage})
-			}
-			
-			/* 以下代码是ok，主要是因为没有appId，先注释掉 */
-			// var info = info.mp.detail.userInfo; // 结构和App端返回的不太一样
-			/** 返回的userInfo里头没有 openId、session_key
+			// 向本地获取签名信息
+			var sign = uni.getStorageSync('sign');
+			// 发起登录请求（openId版）
+			// var info = info.mp.detail.userInfo; // 结构和App端返回的不太一样，因为没有appId所以获得不到正确的info，故先注释掉
+			/** 返回的userInfo里头没有 openId、session_key，       userInfo这段是注释，看结构而已！
 			    userInfo = {
 					avatarUrl: "",
 					city: "",
@@ -70,14 +60,79 @@ export default {
 					province: ""
 			    }
 			 */
+			uni.request({
+				url: _self.apiServer+'member&m=login',
+				method: 'POST',
+				header: {'content-type': 'application/x-www-form-urlencoded'}, // POST请求要加header
+				data: {
+					openid: openid, // 此openid全局变量，是在页面加载完毕时就已经拿到了，后台是以用户的openId来做为用户登录的凭证
+					// name:   info.nickName,
+					// face:   info.avatarUrl,
+					name:   '张三',
+					face:   'http://test123',
+					sign:   sign
+				},
+				success: res => {
+					console.log(res);
+					var resp = res.data;
+					if (resp.status == 'ok') {
+						uni.showToast({title: '登录成功'});
+						// 将后台返回的用户信息存到前端本地，我们采用同步写入前端本地
+						uni.setStorageSync('SUID', resp.data.u_id + '');
+						uni.setStorageSync('SRAND', resp.data.u_random + '');
+						uni.setStorageSync('SNAME', resp.data.u_name + '');
+						uni.setStorageSync('SFACE', resp.data.u_face + '');
+						// 跳转 {"backpage":"../write/write","backtype":"2"} 
+						if (pageOptions.backpage == '1') { // 约定的而已
+							uni.redirectTo({url: pageOptions.backpage})
+						} else {
+							uni.switchTab({url: pageOptions.backpage})
+						}
+					} else {
+						uni.showToast({title: '登录失败', icon: 'none'});
+					}
+				},
+				fail: () => {
+				}
+			});
+			// 模拟登录成功
+			// uni.showToast({title: '登录成功'});
+			// uni.setStorageSync('SUID', '123');
+			// uni.setStorageSync('SRAND', '456');
+			// uni.setStorageSync('SNAME', '小明');
+			// uni.setStorageSync('SFACE', 'fjdsafdsa');
+			// // 跳转 {"backpage":"../write/write","backtype":"2"} 
+			// if (pageOptions.backpage == '1') { // 约定的而已
+			// 	uni.redirectTo({url: pageOptions.backpage})
+			// } else {
+			// 	uni.switchTab({url: pageOptions.backpage})
+			// }
+			
+			/* 以下代码是ok（openId版）主要是因为没有appId，先注释掉 */
+			// var info = info.mp.detail.userInfo; // 结构和App端返回的不太一样
+			/** 返回的userInfo里头没有 openId、session_key，  userInfo这段是注释，看结构而已
+			    userInfo = {
+					avatarUrl: "",
+					city: "",
+					country: "",
+					gender: 1,
+					language: "zh_CN",
+					nickName: "",
+					province: ""
+			    }
+			 */
+			// 向本地获取签名信息
+			// var sign = uni.getStorageSync('sign');
+			// 发起登录请求
 			// uni.request({
 			// 	url: _self.apiServer+'member&m=login',
-			// 	method: 'GET',
+			// 	method: 'POST',
 			// 	header: {'content-type': 'application/x-www-form-urlencoded'}, // POST请求要加header
 			// 	data: {
 			// 		openid: openid, // 此openid全局变量，是在页面加载完毕时就已经拿到了，后台是以用户的openId来做为用户登录的凭证
 			// 		name:   info.nickName,
-			// 		face:   info.avatarUrl
+			// 		face:   info.avatarUrl,
+			//      sign:   sign
 			// 	},
 			// 	success: res => {
 			// 		console.log(res);
@@ -106,11 +161,15 @@ export default {
 	},
 	// 当此页面被加载的时候
 	onLoad: function(options) {
-		_self = this;
+		// 复制一份options
 		pageOptions = options;
 		console.log(JSON.stringify(options));
-		// 微信开放平台申请应用的appId等（第三方平台 开发接入）：https://open.weixin.qq.com
+		// 复制Vue实例
+		_self = this;
+		// 向服务器获取签名信息并记录在本地
+		sign.sign(_self.apiServer);
 		
+		// 微信开放平台申请应用的appId等（第三方平台 开发接入）：https://open.weixin.qq.com
 		/**
 		 * 微信（小程序进入login页面时，uniapp封装的login方法就会向微信服务器发起请求，若没有在manifest.json正确的填写appId，
 		 *      则获取不到正确的code值，这个code值的作用是：可以通过此code拿到用户的openId、sessionKey等信息，
@@ -125,17 +184,18 @@ export default {
 				/**
 				 * 小程序中若要使用微信登录，其过程与App端使用微信登录的流程不太一样，
 				 * 1、小程序要通过一个open-type="getUserInfo"的按钮去选择微信登录，App不需要这样；
-				 * 2、点击按钮又可以获得其它的信息
-				 * 
+				 * 2、点击按钮可以获得用户的其它的信息
 				 */
 				uni.request({
 					url: _self.apiServer+'member&m=codeToSession&code='+loginRes.code, // 疑问：为何前端不直接发起向微信的请求，需要让后台发起？
 					method: 'GET',
 					success: res => {
 						console.log(res);
-						// 后台返回的数据
-						openid = res.data.openid;
-						session_key = res.data.session_key;
+						// 后台返回的数据，由于code是非法数据，因为拿不到openid等信息，所以模拟一下数据
+						// openid = res.data.openid;
+						// session_key = res.data.session_key;
+						openid = '1234567890';
+						session_key = 'test666777888';
 					}
 				});
 			},
@@ -168,6 +228,9 @@ export default {
 								success: (info) => {
 									// 成功从微信拿到用户信息
 									console.log(JSON.stringify(info));
+									// 向本地获取签名信息
+									var sign = uni.getStorageSync('sign');
+									console.log("login >> app >> sign = "+sign);
 									uni.request({
 										url: _self.apiServer+'member&m=login',
 										method: 'POST',
@@ -175,13 +238,14 @@ export default {
 										data: {
 											openid: info.userInfo.openId,
 											name:   info.userInfo.nickName,
-											face:   info.userInfo.avatarUrl
+											face:   info.userInfo.avatarUrl,
+											sign:   sign
 										},
 										success: res => {
 											console.log(JSON.stringify(res));
 											var resp = res.data;
 											if (resp.status == 'ok') {
-												uni.showToast({title: '登录成功'});
+												uni.showToast({title: "登录成功"});
 												// 将后台返回的用户信息存到前端本地，我们采用同步写入前端本地
 												uni.setStorageSync('SUID', resp.data.u_id + '');
 												uni.setStorageSync('SRAND', resp.data.u_random + '');
@@ -189,13 +253,13 @@ export default {
 												uni.setStorageSync('SFACE', resp.data.u_face + '');
 												// 跳转 {"backpage":"../write/write","backtype":"2"} 
 												if (options.backpage == '1') { // 约定的而已
-													uni.redirectTo({url: options.backpage})
+													uni.redirectTo({url: options.backpage});
 												} else {
-													uni.switchTab({url: options.backpage})
+													uni.switchTab({url: options.backpage});
 												}
 											} else {
 												// 登录失败
-												uni.showToast({title: res.errMsg});
+												uni.showToast({title: "登录失败", icon:"none"});
 											}
 										},
 										fail: (e) => {
