@@ -19,10 +19,11 @@ Vue.prototype.checkLogin = function(backpage, backtype) {
 	// 登录成功 返回用户信息后续操作会用到 http://296883fh32.wicp.vip/index.php?token=api2018&c=member
 	return [SUID, SRAND, SNAME, SFACE];
 }
-//
+// api接口地址
 var APITOKEN = 'api2018';
 Vue.prototype.apiServer = 'http://296883fh32.wicp.vip/index.php?token='+APITOKEN+'&c=';
-//
+// 静态文件服务器的地址（可以采用第三方的静态云存储,当我们的服务器将静态文件上传到这样的静态云存储后会返回一个文件的地址）
+Vue.prototype.staticServer = 'http://296883fh32.wicp.vip/';
 
 App.mpType = 'app'
 

@@ -68,7 +68,7 @@ export default {
 					openid: openid, // 此openid全局变量，是在页面加载完毕时就已经拿到了，后台是以用户的openId来做为用户登录的凭证
 					// name:   info.nickName,
 					// face:   info.avatarUrl,
-					name:   '张三',
+					name:   '小Q',
 					face:   'http://test123',
 					sign:   sign
 				},
